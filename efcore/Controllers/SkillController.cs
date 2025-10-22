@@ -17,13 +17,17 @@ namespace efcore.Controllers
         }
         [HttpGet("get")]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<List<Skill>?>> GetSkill()
+        public async Task<ActionResult<List<SkillOutputDto>?>> GetSkill()
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            //var request = Guid.Parse(userId);
             if (Guid.TryParse(userId, out Guid request))
             {
-                return Ok(await _SkillService.GetSkill(request));
+                List<SkillOutputDto>? skills = await _SkillService.GetSkill(request);
+                if (skills == null)
+                {
+                    return NotFound("Skill not Found");
+                }
+                return Ok(skills);
             }
             else
             {
@@ -32,24 +36,45 @@ namespace efcore.Controllers
         }
         [HttpGet("getall")]
         [Authorize(Roles = "Admin")]
-        public async Task<ActionResult<List<Skill>>> GetAllSkill()
+        public async Task<ActionResult<List<SkillOutputDto>>> GetAllSkill()
         {
-            return Ok(await _SkillService.GetAllSkill());
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(userId, out Guid request))
+            {
+                List<SkillOutputDto> skills = await _SkillService.GetAllSkill();
+                if (skills == null)
+                {
+                    return NotFound("Skill not Found");
+                }
+                return Ok(skills);
+            }
+            else
+            {
+                return BadRequest("Invalid user ID");
+            }
         }
         [HttpGet("{request}")]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<Skill>> GetSkillById(Guid request)
+        public async Task<ActionResult<SkillOutputDto>> GetSkillById(Guid request)
         {
-            Skill? skill = await _SkillService.GetSkillById(request);
-            if (skill == null)
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(userId, out Guid sender))
             {
-                return NotFound("Skill not Found");
+                SkillOutputDto? skills = await _SkillService.GetSkillById(request, sender);
+                if (skills == null)
+                {
+                    return NotFound("Skill not Found");
+                }
+                return Ok(skills);
             }
-            return Ok(skill);
+            else
+            {
+                return BadRequest("Invalid user ID");
+            }
         }
         [HttpPost]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<Skill?>> AddSkill(SkillInputDto request)
+        public async Task<ActionResult<string?>> AddSkill(SkillInputDto request)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             //var sender = Guid.Parse(userId);
@@ -59,30 +84,46 @@ namespace efcore.Controllers
             }
             else
             {
-                return BadRequest("Invalid user ID");
+                return BadRequest("Invalid user ID.");
             }
         }
         [HttpPut("{request}")]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<Skill>> UpdateSkillById(Guid request, SkillInputDto newSkill)
+        public async Task<ActionResult<string>> UpdateSkillById(Guid request, SkillInputDto newSkill)
         {
-            var skill = await _SkillService.UpdateSkillById(request, newSkill);
-            if (skill == null)
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(userId, out Guid sender))
             {
-                return NotFound("Skill not Found");
+                var skills = await _SkillService.UpdateSkillById(request, newSkill, sender);
+                if (skills == null)
+                {
+                    return NotFound("Skill not Found");
+                }
+                return Ok(skills);
             }
-            return Ok(skill);
+            else
+            {
+                return BadRequest("Invalid user ID.");
+            }
         }
         [HttpDelete("{request}")]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<List<Skill>>> DeleteSkillById(Guid request)
+        public async Task<ActionResult<List<string>>> DeleteSkillById(Guid request)
         {
-            var skill = await _SkillService.DeleteSkillById(request);
-            if (skill == null)
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(userId, out Guid sender))
             {
-                return NotFound("Skill not Found");
+                var skills = await _SkillService.DeleteSkillById(request, sender);
+                if (skills == null)
+                {
+                    return NotFound("Skill not Found");
+                }
+                return Ok(skills);
             }
-            return Ok(skill);
+            else
+            {
+                return BadRequest("Invalid user ID.");
+            }
         }
     }
 }

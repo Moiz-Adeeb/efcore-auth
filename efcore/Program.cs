@@ -67,6 +67,8 @@ namespace efcore
 
             var app = builder.Build();
 
+            app.UseCors("AllowFrontend");
+
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {

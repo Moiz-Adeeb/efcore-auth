@@ -11,26 +11,32 @@ namespace efcore.Services
             _datacontext = datacontext;
         }
 
-        public async Task<List<Category>?> GetCategory(Guid request)
+        public async Task<List<CategoryOutputDto>?> GetCategory(Guid request)
         {
-            List<Category>? category = await _datacontext.Category
-                .Where(u => u.UserId == request).ToListAsync();
+            var category = await _datacontext.Category
+                .Where(u => u.UserId == request)
+                .Select(c => c.ToOutputDto())
+                .ToListAsync();
             return category;
         }
-        public async Task<List<Category>> GetAllCategory()
+        public async Task<List<CategoryOutputDto>> GetAllCategory()
         {
-            return await _datacontext.Category.ToListAsync();
+            return await _datacontext.Category.Select(c => c.ToOutputDto()).ToListAsync();
         }
-        public async Task<Category?> GetCategoryById(Guid request)
+        public async Task<CategoryOutputDto?> GetCategoryById(Guid request, Guid sender)
         {
             Category? category = await _datacontext.Category.FindAsync(request);
             if (category == null)
             {
                 return null;
             }
-            return category;
+            if (category.UserId != sender)
+            {
+                return null;
+            }
+            return category.ToOutputDto();
         }
-        public async Task<Category?> AddCategory(CategoryInputDto request, Guid sender)
+        public async Task<string?> AddCategory(CategoryInputDto request, Guid sender)
         {
             var newCategory = new Category
             {
@@ -43,32 +49,40 @@ namespace efcore.Services
             };
             await _datacontext.Category.AddAsync(newCategory);
             _datacontext.SaveChanges();
-            return newCategory;
+            return "Category Added Successfully";
         }
-        public async Task<Category?> UpdateCategoryById(Guid request, CategoryInputDto newCategory)
+        public async Task<string?> UpdateCategoryById(Guid request, CategoryInputDto newCategory, Guid sender)
         {
             Category? category = await _datacontext.Category.FindAsync(request);
             if (category == null)
             {
-                return null;
+                return "Category not Found";
+            }
+            if (category.UserId != sender)
+            {
+                return "Unauthorized to update this category";
             }
             category.CategoryName = newCategory.CategoryName;
             category.CategoryDescription = newCategory.CategoryDescription;
             category.UpdatedAt = DateTime.Now;
             await _datacontext.SaveChangesAsync();
-            return category;
+            return "Category Updated Successfully";
         }
-        public async Task<Category?> DeleteCategoryById(Guid request)
+        public async Task<string?> DeleteCategoryById(Guid request, Guid sender)
         {
             Category? category = await _datacontext.Category
                 .FindAsync(request);
             if (category == null)
             {
-                return null;
+                return "Category not Found";
+            }
+            if (category.UserId != sender)
+            {
+                return "Unauthorized to delete this category";
             }
             _datacontext.Category.Remove(category);
             await _datacontext.SaveChangesAsync();
-            return category;
+            return "Category Deleted Succesfully";
         }
     }
 }

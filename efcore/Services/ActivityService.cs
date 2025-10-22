@@ -12,53 +12,78 @@ namespace efcore.Services
             _datacontext = datacontext;
         }
 
-        public async Task<List<Activity>?> GetActivity(Guid request)
+        public async Task<List<ActivityOutputDto>> GetActivity(Guid request)
         {
-            List<Activity>? Activity = await _datacontext.Activity
-                .Where(u => u.UserId == request).ToListAsync();
-            return Activity;
+            List<ActivityOutputDto> activities = await _datacontext.Activity
+                    .AsNoTracking()
+                    .Where(a => a.UserId == request)
+                    .Select(a => new ActivityOutputDto
+                    {
+                        ActivityId = a.ActivityId,
+                        ActivityName = a.ActivityName,
+                        ActivityDescription = a.ActivityDescription,
+                        UserName = a.User.Username,
+                        CategoryId = a.CategoryId,
+                        CategoryName = a.Category.CategoryName,
+                        CategoryDescription = a.Category.CategoryDescription,
+                        Skills = a.ActivitySkills.Select(s => new SkillOutputDto
+                        {
+                            SkillId = s.Skill.SkillId,
+                            SkillName = s.Skill.SkillName,
+                            SkillDescription = s.Skill.SkillDescription
+                        }).ToList()
+                    })
+                    .ToListAsync();
+
+            return activities;
         }
-        public async Task<List<Activity>> GetAllActivity()
+        public async Task<List<ActivityOutputDto>> GetAllActivity()
         {
-            return await _datacontext.Activity.ToListAsync();
+            return await _datacontext.Activity.Select(c => c.ToOutputDto()).ToListAsync();
         }
-        public async Task<ActivityOutputDto?> GetActivityById(Guid request)
+        public async Task<ActivityOutputDto?> GetActivityById(Guid request, Guid sender)
         {
-            Activity? activity = await _datacontext.Activity
-                        .Include(a => a.ActivitySkills)
-                        .ThenInclude(pas => pas.Skill)
-                        .FirstOrDefaultAsync(a => a.ActivityId == request);
+            var activity = await _datacontext.Activity
+                .Where(a => a.ActivityId == request && a.UserId == sender)
+                .Select(a => new ActivityOutputDto
+                {
+                    ActivityId = a.ActivityId,
+                    ActivityName = a.ActivityName,
+                    ActivityDescription = a.ActivityDescription,
+                    UserName = a.User.Username,
+                    CategoryId = a.CategoryId,
+                    CategoryName = a.Category.CategoryName,
+                    CategoryDescription = a.Category.CategoryDescription,
+                    Skills = a.ActivitySkills.Select(s => new SkillOutputDto
+                    {
+                        SkillId = s.Skill.SkillId,
+                        SkillName = s.Skill.SkillName,
+                        SkillDescription = s.Skill.SkillDescription
+                    }).ToList()
+                })
+                .FirstOrDefaultAsync();
+
             if (activity == null)
             {
                 return null;
             }
-            var ActivityOutputDto = new ActivityOutputDto
-            {
-                ActivityName = activity.ActivityName,
-                // ... other properties
-                Skills = activity.ActivitySkills.Select(pas => new SkillOutputDto
-                {
-                    SkillId = pas.Skill.SkillId,
-                    SkillName = pas.Skill.SkillName
-                }).ToList()
-            };
 
-            return ActivityOutputDto;
+            return activity;
         }
-        public async Task<Activity?> AddActivity(ActivityInputDto request, Guid sender)
+        public async Task<string?> AddActivity(ActivityInputDto request, Guid sender)
         {
-            var skills = await _datacontext.Skill
+            List<Skill> skills = await _datacontext.Skill
                             .Where(s => request.SkillIds.Contains(s.SkillId))
                             .ToListAsync();
-            var newActivity = new Activity
+            Activity newActivity = new()
             {
                 ActivityId = Guid.NewGuid(),
                 ActivityName = request.ActivityName,
                 ActivityDescription = request.ActivityDescription,
                 UserId = sender,
                 CategoryId = request.CategoryId,
-                CreatedAt = DateTime.Now,
-                UpdatedAt = DateTime.Now
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             };
             foreach (var skillId in skills)
             {
@@ -66,22 +91,54 @@ namespace efcore.Services
             }
             await _datacontext.Activity.AddAsync(newActivity);
             await _datacontext.SaveChangesAsync();
-            return newActivity;
+            return "Activity Added Successfully";
         }
-        public async Task<Activity?> UpdateActivityById(Guid request, ActivityInputDto newActivity)
+        public async Task<string?> UpdateActivityById(Guid request, ActivityInputDto newActivity, Guid sender)
         {
-            Activity? Activity = await _datacontext.Activity.FindAsync(request);
+            Activity? Activity = await _datacontext.Activity
+                .Include(a => a.ActivitySkills)
+                .FirstOrDefaultAsync(a => a.ActivityId == request);
             if (Activity == null)
             {
                 return null;
             }
+            if (Activity.UserId != sender)
+            {
+                return "Unauthorized to update this Activity";
+            }
             Activity.ActivityName = newActivity.ActivityName;
             Activity.ActivityDescription = newActivity.ActivityDescription;
-            Activity.UpdatedAt = DateTime.Now;
+            Activity.CategoryId = newActivity.CategoryId;
+            Activity.UpdatedAt = DateTime.UtcNow;
+
+            HashSet<Guid> requestedSkillIds = newActivity.SkillIds.ToHashSet();
+            HashSet<Guid> currentSkillIds = Activity.ActivitySkills.Select(s => s.SkillId).ToHashSet();
+
+            List<ActivitySkill>? skillsToRemove = Activity.ActivitySkills
+                .Where(s => !requestedSkillIds.Contains(s.SkillId))
+                .ToList();
+
+            List<Guid>? skillIdsToAdd = requestedSkillIds
+                .Except(currentSkillIds)
+                .ToList();
+
+            if (skillsToRemove.Count > 0)
+                _datacontext.Activity_Skills.RemoveRange(skillsToRemove);
+
+            if (skillIdsToAdd.Count > 0)
+            {
+                var newSkills = skillIdsToAdd.Select(skillId => new ActivitySkill
+                {
+                    ActivityId = Activity.ActivityId,
+                    SkillId = skillId
+                });
+
+                await _datacontext.Activity_Skills.AddRangeAsync(newSkills);
+            }
             await _datacontext.SaveChangesAsync();
-            return Activity;
+            return "Activity Updated Successfully";
         }
-        public async Task<Activity?> DeleteActivityById(Guid request)
+        public async Task<string?> DeleteActivityById(Guid request, Guid sender)
         {
             Activity? Activity = await _datacontext.Activity
                 .FindAsync(request);
@@ -89,9 +146,17 @@ namespace efcore.Services
             {
                 return null;
             }
+            if (Activity.UserId != sender)
+            {
+                return "Unauthorized to delete this Activity";
+            }
+
+            List<ActivitySkill> skills = await _datacontext.Activity_Skills
+                .Where(a => a.ActivityId == request).ToListAsync();
             _datacontext.Activity.Remove(Activity);
+            _datacontext.Activity_Skills.RemoveRange(skills);
             await _datacontext.SaveChangesAsync();
-            return Activity;
+            return "Activity Deleted Successfully";
         }
     }
 }

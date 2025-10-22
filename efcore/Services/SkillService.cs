@@ -10,26 +10,32 @@ namespace efcore.Services
         {
             _datacontext = datacontext;
         }
-        public async Task<List<Skill>?> GetSkill(Guid request)
+        public async Task<List<SkillOutputDto>?> GetSkill(Guid request)
         {
-            List<Skill>? skill = await _datacontext.Skill
-                .Where(u => u.UserId == request).ToListAsync();
+            var skill = await _datacontext.Skill
+                .Where(u => u.UserId == request)
+                .Select(c => c.ToOutputDto())
+                .ToListAsync();
             return skill;
         }
-        public async Task<List<Skill>> GetAllSkill()
+        public async Task<List<SkillOutputDto>> GetAllSkill()
         {
-            return await _datacontext.Skill.ToListAsync();
+            return await _datacontext.Skill.Select(c => c.ToOutputDto()).ToListAsync();
         }
-        public async Task<Skill?> GetSkillById(Guid request)
+        public async Task<SkillOutputDto?> GetSkillById(Guid request, Guid sender)
         {
             Skill? skill = await _datacontext.Skill.FindAsync(request);
             if (skill == null)
             {
                 return null;
             }
-            return skill;
+            if (skill.UserId != sender)
+            {
+                return null;
+            }
+            return skill.ToOutputDto();
         }
-        public async Task<Skill?> AddSkill(SkillInputDto request, Guid sender)
+        public async Task<string?> AddSkill(SkillInputDto request, Guid sender)
         {
             var newSkill = new Skill
             {
@@ -42,32 +48,40 @@ namespace efcore.Services
             };
             await _datacontext.Skill.AddAsync(newSkill);
             _datacontext.SaveChanges();
-            return newSkill;
+            return "Skill Added Successfully";
         }
-        public async Task<Skill?> UpdateSkillById(Guid request, SkillInputDto newSkill)
+        public async Task<string?> UpdateSkillById(Guid request, SkillInputDto newSkill, Guid sender)
         {
             Skill? skill = await _datacontext.Skill.FindAsync(request);
             if (skill == null)
             {
-                return null;
+                return "Skill not Found";
+            }
+            if (skill.UserId != sender)
+            {
+                return "Unauthorized to update this category";
             }
             skill.SkillName = newSkill.SkillName;
             skill.SkillDescription = newSkill.SkillDescription;
             skill.UpdatedAt = DateTime.Now;
             await _datacontext.SaveChangesAsync();
-            return skill;
+            return "Skill Updated Successfully";
         }
-        public async Task<Skill?> DeleteSkillById(Guid request)
+        public async Task<string?> DeleteSkillById(Guid request, Guid sender)
         {
             Skill? skill = await _datacontext.Skill
                 .FindAsync(request);
             if (skill == null)
             {
-                return null;
+                return "Skill not Found";
+            }
+            if (skill.UserId != sender)
+            {
+                return "Unauthorized to delete this skill";
             }
             _datacontext.Skill.Remove(skill);
             await _datacontext.SaveChangesAsync();
-            return skill;
+            return "Skill Deletted Successfully";
         }
     }
 }

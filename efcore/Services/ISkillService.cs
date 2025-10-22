@@ -2,11 +2,11 @@
 {
     public interface ISkillService
     {
-        Task<List<Skill>?> GetSkill(Guid request);
-        Task<List<Skill>> GetAllSkill();
-        Task<Skill?> GetSkillById(Guid request);
-        Task<Skill?> AddSkill(SkillInputDto request, Guid sender);
-        Task<Skill?> UpdateSkillById(Guid request, SkillInputDto newSkill);
-        Task<Skill?> DeleteSkillById(Guid request);
+        Task<List<SkillOutputDto>?> GetSkill(Guid request);
+        Task<List<SkillOutputDto>> GetAllSkill();
+        Task<SkillOutputDto?> GetSkillById(Guid request, Guid sender);
+        Task<string?> AddSkill(SkillInputDto request, Guid sender);
+        Task<string?> UpdateSkillById(Guid request, SkillInputDto newSkill, Guid sender);
+        Task<string?> DeleteSkillById(Guid request, Guid sender);
     }
 }

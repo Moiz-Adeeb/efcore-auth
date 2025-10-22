@@ -17,13 +17,17 @@ namespace efcore.Controllers
         }
         [HttpGet("get")]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<List<Activity>?>> GetActivity()
+        public async Task<ActionResult<List<ActivityOutputDto>?>> GetActivity()
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            //var request = Guid.Parse(userId);
             if (Guid.TryParse(userId, out Guid request))
             {
-                return Ok(await _ActivityService.GetActivity(request));
+                List<ActivityOutputDto>? activities = await _ActivityService.GetActivity(request);
+                if (activities == null)
+                {
+                    return NotFound("Skill not Found");
+                }
+                return Ok(activities);
             }
             else
             {
@@ -32,24 +36,45 @@ namespace efcore.Controllers
         }
         [HttpGet("getall")]
         [Authorize(Roles = "Admin")]
-        public async Task<ActionResult<List<Activity>>> GetAllActivity()
+        public async Task<ActionResult<List<ActivityOutputDto>>> GetAllActivity()
         {
-            return Ok(await _ActivityService.GetAllActivity());
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(userId, out Guid request))
+            {
+                List<ActivityOutputDto> activities = await _ActivityService.GetAllActivity();
+                if (activities == null)
+                {
+                    return NotFound("Skill not Found");
+                }
+                return Ok(activities);
+            }
+            else
+            {
+                return BadRequest("Invalid user ID");
+            }
         }
         [HttpGet("getActivity")]
         [Authorize(Roles = "User")]
         public async Task<ActionResult<ActivityOutputDto>> GetActivityById(Guid request)
         {
-            ActivityOutputDto? Activity = await _ActivityService.GetActivityById(request);
-            if (Activity == null)
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(userId, out Guid sender))
             {
-                return NotFound("Activity not Found");
+                ActivityOutputDto? activities = await _ActivityService.GetActivityById(request, sender);
+                if (activities == null)
+                {
+                    return NotFound("Skill not Found");
+                }
+                return Ok(activities);
             }
-            return Ok(Activity);
+            else
+            {
+                return BadRequest("Invalid user ID");
+            }
         }
         [HttpPost]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<Activity?>> AddActivity(ActivityInputDto request)
+        public async Task<ActionResult<string?>> AddActivity(ActivityInputDto request)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             //var sender = Guid.Parse(userId);
@@ -64,25 +89,41 @@ namespace efcore.Controllers
         }
         [HttpPut("{request}")]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<Activity>> UpdateActivityById(Guid request, ActivityInputDto newActivity)
+        public async Task<ActionResult<string>> UpdateActivityById(Guid request, ActivityInputDto newActivity)
         {
-            var categories = await _ActivityService.UpdateActivityById(request, newActivity);
-            if (categories == null)
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(userId, out Guid sender))
             {
-                return NotFound("Activity not Found");
+                var activities = await _ActivityService.UpdateActivityById(request, newActivity, sender);
+                if (activities == null)
+                {
+                    return NotFound("Skill not Found");
+                }
+                return Ok(activities);
             }
-            return Ok(categories);
+            else
+            {
+                return BadRequest("Invalid user ID.");
+            }
         }
         [HttpDelete("{request}")]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<Activity>> DeleteActivityById(Guid request)
+        public async Task<ActionResult<string>> DeleteActivityById(Guid request)
         {
-            var Activity = await _ActivityService.DeleteActivityById(request);
-            if (Activity == null)
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(userId, out Guid sender))
             {
-                return NotFound("Activity not Found");
+                var activities = await _ActivityService.DeleteActivityById(request, sender);
+                if (activities == null)
+                {
+                    return NotFound("Skill not Found");
+                }
+                return Ok(activities);
             }
-            return Ok(Activity);
+            else
+            {
+                return BadRequest("Invalid user ID.");
+            }
         }
     }
 }

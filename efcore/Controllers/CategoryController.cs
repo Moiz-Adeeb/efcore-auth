@@ -17,13 +17,17 @@ namespace efcore.Controllers
         }
         [HttpGet("get")]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<List<Category>?>> GetCategory()
+        public async Task<ActionResult<List<CategoryOutputDto>?>> GetCategory()
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            //var request = Guid.Parse(userId);
             if (Guid.TryParse(userId, out Guid request))
             {
-                return Ok(await _CategoryService.GetCategory(request));
+                List<CategoryOutputDto>? category = await _CategoryService.GetCategory(request);
+                if (category == null)
+                {
+                    return NotFound("Category not Found");
+                }
+                return Ok(category);
             }
             else
             {
@@ -32,24 +36,45 @@ namespace efcore.Controllers
         }
         [HttpGet("getall")]
         [Authorize(Roles = "Admin")]
-        public async Task<ActionResult<List<Category>>> GetAllCategory()
+        public async Task<ActionResult<List<CategoryOutputDto>>> GetAllCategory()
         {
-            return Ok(await _CategoryService.GetAllCategory());
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(userId, out Guid request))
+            {
+                List<CategoryOutputDto> category = await _CategoryService.GetAllCategory();
+                if (category == null)
+                {
+                    return NotFound("Category not Found");
+                }
+                return Ok(category);
+            }
+            else
+            {
+                return BadRequest("Invalid user ID");
+            }
         }
         [HttpGet("getcategory")]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<Category>> GetCategoryById(Guid request)
+        public async Task<ActionResult<CategoryOutputDto>> GetCategoryById(Guid request)
         {
-            Category? category = await _CategoryService.GetCategoryById(request);
-            if (category == null)
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(userId, out Guid sender))
             {
-                return NotFound("Category not Found");
+                CategoryOutputDto? category = await _CategoryService.GetCategoryById(request, sender);
+                if (category == null)
+                {
+                    return NotFound("Category not Found");
+                }
+                return Ok(category);
             }
-            return Ok(category);
+            else
+            {
+                return BadRequest("Invalid user ID");
+            }
         }
         [HttpPost]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<Category?>> AddCategory(CategoryInputDto request)
+        public async Task<ActionResult<string>> AddCategory(CategoryInputDto request)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             //var sender = Guid.Parse(userId);
@@ -64,25 +89,41 @@ namespace efcore.Controllers
         }
         [HttpPut("{request}")]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<Category>> UpdateCategoryById(Guid request, CategoryInputDto newCategory)
+        public async Task<ActionResult<string>> UpdateCategoryById(Guid request, CategoryInputDto newCategory)
         {
-            var categories = await _CategoryService.UpdateCategoryById(request, newCategory);
-            if (categories == null)
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(userId, out Guid sender))
             {
-                return NotFound("Category not Found");
+                var categories = await _CategoryService.UpdateCategoryById(request, newCategory, sender);
+                if (categories == null)
+                {
+                    return NotFound("Category not Found");
+                }
+                return Ok(categories);
             }
-            return Ok(categories);
+            else
+            {
+                return BadRequest("Invalid user ID.");
+            }
         }
         [HttpDelete("{request}")]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<Category>> DeleteCategoryById(Guid request)
+        public async Task<ActionResult<string>> DeleteCategoryById(Guid request)
         {
-            var category = await _CategoryService.DeleteCategoryById(request);
-            if (category == null)
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(userId, out Guid sender))
             {
-                return NotFound("Category not Found");
+                var categories = await _CategoryService.DeleteCategoryById(request, sender);
+                if (categories == null)
+                {
+                    return NotFound("Category not Found");
+                }
+                return Ok(categories);
             }
-            return Ok(category);
+            else
+            {
+                return BadRequest("Invalid user ID.");
+            }
         }
     }
 }

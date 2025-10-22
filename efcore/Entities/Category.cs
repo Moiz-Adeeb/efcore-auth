@@ -8,7 +8,7 @@
         public Guid UserId { get; set; } 
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
-        public CategoryInputDto ToDto()
+        public CategoryInputDto ToInputDto()
         {
             return new CategoryInputDto
             {
@@ -25,5 +25,10 @@
                 CategoryDescription = this.CategoryDescription,
             };
         }
+    }
+    public static class CategoryExtensions
+    {
+        public static List<CategoryOutputDto> ToOutputDtoList(this IEnumerable<Category> categories)
+            => categories.Select(c => c.ToOutputDto()).ToList();
     }
 }
