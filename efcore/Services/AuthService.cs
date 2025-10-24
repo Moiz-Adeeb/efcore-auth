@@ -1,5 +1,5 @@
-﻿using Microsoft.AspNetCore.Identity;
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
+using Microsoft.AspNetCore.Identity;
 
 namespace efcore.Services
 {

@@ -2,10 +2,11 @@
 {
     public class Skill
     {
-        public required Guid SkillId { get; set; }
-        public required string SkillName { get; set; } = string.Empty;
-        public required string SkillDescription { get; set; } = string.Empty;
-        public required Guid UserId { get; set; }
+        public  Guid SkillId { get; set; }
+        public string SkillName { get; set; } = string.Empty;
+        public string SkillDescription { get; set; } = string.Empty;
+        public Guid UserId { get; set; }
+        public User User { get; set; } = null!;
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public ICollection<ActivitySkill> ActivitySkills { get; set; } = new List<ActivitySkill>();
@@ -24,6 +25,7 @@
                 SkillId = this.SkillId,
                 SkillName = this.SkillName,
                 SkillDescription = this.SkillDescription,
+                UserName = this.User.Username
             };
         }
     }

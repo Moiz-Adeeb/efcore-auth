@@ -1,22 +1,22 @@
-﻿using efcore.Data;
-using Microsoft.AspNetCore.Components.Forms;
-
-namespace efcore.Services
+﻿namespace efcore.Services
 {
     public class ActivityService : IActivityService
     {
-        private readonly DataContext _datacontext;
-
-        public ActivityService(DataContext datacontext)
+        private readonly DataContext _dataContext;
+        private readonly IHttpContextAccessor _contextAccessor;
+        public ActivityService(DataContext dataContext, IHttpContextAccessor contextAccessor)
         {
-            _datacontext = datacontext;
+            _dataContext = dataContext;
+            _contextAccessor = contextAccessor;
         }
 
-        public async Task<List<ActivityOutputDto>> GetActivity(Guid request)
+        public async Task<List<ActivityOutputDto>?> GetActivity()
         {
-            List<ActivityOutputDto> activities = await _datacontext.Activity
+            var userId = _contextAccessor.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!Guid.TryParse(userId, out var id)!) return null;
+            var activities = await _dataContext.Activity
                     .AsNoTracking()
-                    .Where(a => a.UserId == request)
+                    .Where(a => a.UserId == id)
                     .Select(a => new ActivityOutputDto
                     {
                         ActivityId = a.ActivityId,
@@ -37,14 +37,39 @@ namespace efcore.Services
 
             return activities;
         }
-        public async Task<List<ActivityOutputDto>> GetAllActivity()
+        public async Task<List<ActivityOutputDto>?> GetAllActivity()
         {
-            return await _datacontext.Activity.Select(c => c.ToOutputDto()).ToListAsync();
+            var role = _contextAccessor.HttpContext!.User.FindFirstValue(ClaimTypes.Role)!;
+            if (role is not ("Admin" or "Manager")) return null;
+            var activities = await _dataContext.Activity
+                .AsNoTracking()
+                .Select(a => new ActivityOutputDto
+                {
+                    ActivityId = a.ActivityId,
+                    ActivityName = a.ActivityName,
+                    ActivityDescription = a.ActivityDescription,
+                    UserName = a.User.Username,
+                    CategoryId = a.CategoryId,
+                    CategoryName = a.Category.CategoryName,
+                    CategoryDescription = a.Category.CategoryDescription,
+                    Skills = a.ActivitySkills.Select(s => new SkillOutputDto
+                    {
+                        SkillId = s.Skill.SkillId,
+                        SkillName = s.Skill.SkillName,
+                        SkillDescription = s.Skill.SkillDescription
+                    }).ToList()
+                })
+                .ToListAsync();
+            return activities;
         }
-        public async Task<ActivityOutputDto?> GetActivityById(Guid request, Guid sender)
+        public async Task<ActivityOutputDto?> GetActivityById(Guid request)
         {
-            var activity = await _datacontext.Activity
-                .Where(a => a.ActivityId == request && a.UserId == sender)
+            var userId = _contextAccessor.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            
+            if (Guid.TryParse(userId, out var id)!) return null;
+            
+            var activity = await _dataContext.Activity
+                .Where(a => a.ActivityId == request && a.UserId == id)
                 .Select(a => new ActivityOutputDto
                 {
                     ActivityId = a.ActivityId,
@@ -62,17 +87,14 @@ namespace efcore.Services
                     }).ToList()
                 })
                 .FirstOrDefaultAsync();
-
-            if (activity == null)
-            {
-                return null;
-            }
-
-            return activity;
+            
+            return activity ?? null;
         }
-        public async Task<string?> AddActivity(ActivityInputDto request, Guid sender)
+        public async Task<string?> AddActivity(ActivityInputDto request)
         {
-            List<Skill> skills = await _datacontext.Skill
+            var userId = _contextAccessor.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(userId, out var id)) {}
+            var skills = await _dataContext.Skill
                             .Where(s => request.SkillIds.Contains(s.SkillId))
                             .ToListAsync();
             Activity newActivity = new()
@@ -80,7 +102,7 @@ namespace efcore.Services
                 ActivityId = Guid.NewGuid(),
                 ActivityName = request.ActivityName,
                 ActivityDescription = request.ActivityDescription,
-                UserId = sender,
+                UserId = id,
                 CategoryId = request.CategoryId,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
@@ -89,74 +111,79 @@ namespace efcore.Services
             {
                 newActivity.ActivitySkills.Add(new ActivitySkill { Skill = skillId });
             }
-            await _datacontext.Activity.AddAsync(newActivity);
-            await _datacontext.SaveChangesAsync();
+            await _dataContext.Activity.AddAsync(newActivity);
+            await _dataContext.SaveChangesAsync();
             return "Activity Added Successfully";
         }
-        public async Task<string?> UpdateActivityById(Guid request, ActivityInputDto newActivity, Guid sender)
+        public async Task<string?> UpdateActivityById(Guid request, ActivityInputDto newActivity)
         {
-            Activity? Activity = await _datacontext.Activity
+            var userId = _contextAccessor.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var activity = await _dataContext.Activity
                 .Include(a => a.ActivitySkills)
                 .FirstOrDefaultAsync(a => a.ActivityId == request);
-            if (Activity == null)
+            if (activity == null)
             {
                 return null;
             }
-            if (Activity.UserId != sender)
+            if (activity.UserId.ToString() != userId)
             {
                 return "Unauthorized to update this Activity";
             }
-            Activity.ActivityName = newActivity.ActivityName;
-            Activity.ActivityDescription = newActivity.ActivityDescription;
-            Activity.CategoryId = newActivity.CategoryId;
-            Activity.UpdatedAt = DateTime.UtcNow;
+            activity.ActivityName = newActivity.ActivityName;
+            activity.ActivityDescription = newActivity.ActivityDescription;
+            activity.CategoryId = newActivity.CategoryId;
+            activity.UpdatedAt = DateTime.UtcNow;
 
-            HashSet<Guid> requestedSkillIds = newActivity.SkillIds.ToHashSet();
-            HashSet<Guid> currentSkillIds = Activity.ActivitySkills.Select(s => s.SkillId).ToHashSet();
+            var requestedSkillIds = newActivity.SkillIds.ToHashSet();
+            var currentSkillIds = activity.ActivitySkills.Select(s => s.SkillId).ToHashSet();
 
-            List<ActivitySkill>? skillsToRemove = Activity.ActivitySkills
+            var skillsToRemove = activity.ActivitySkills
                 .Where(s => !requestedSkillIds.Contains(s.SkillId))
                 .ToList();
 
-            List<Guid>? skillIdsToAdd = requestedSkillIds
+            var skillIdsToAdd = requestedSkillIds
                 .Except(currentSkillIds)
                 .ToList();
 
             if (skillsToRemove.Count > 0)
-                _datacontext.Activity_Skills.RemoveRange(skillsToRemove);
+                _dataContext.Activity_Skills.RemoveRange(skillsToRemove);
 
             if (skillIdsToAdd.Count > 0)
             {
                 var newSkills = skillIdsToAdd.Select(skillId => new ActivitySkill
                 {
-                    ActivityId = Activity.ActivityId,
+                    ActivityId = activity.ActivityId,
                     SkillId = skillId
                 });
 
-                await _datacontext.Activity_Skills.AddRangeAsync(newSkills);
+                await _dataContext.Activity_Skills.AddRangeAsync(newSkills);
             }
-            await _datacontext.SaveChangesAsync();
+            await _dataContext.SaveChangesAsync();
             return "Activity Updated Successfully";
         }
-        public async Task<string?> DeleteActivityById(Guid request, Guid sender)
+        public async Task<string?> DeleteActivityById(Guid request)
         {
-            Activity? Activity = await _datacontext.Activity
+            var userId = _contextAccessor.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var role = _contextAccessor.HttpContext!.User.FindFirstValue(ClaimTypes.Role);
+            var activity = await _dataContext.Activity
                 .FindAsync(request);
-            if (Activity == null)
+            if (activity == null)
             {
                 return null;
             }
-            if (Activity.UserId != sender)
+            if (activity.UserId.ToString() == userId || role == "Manager" || role == "Admin")
+            {
+                var skills = await _dataContext.Activity_Skills
+                .Where(a => a.ActivityId == request).ToListAsync();
+                _dataContext.Activity.Remove(activity);
+                _dataContext.Activity_Skills.RemoveRange(skills);
+                await _dataContext.SaveChangesAsync();
+                return "Activity Deleted Successfully";
+            } else
             {
                 return "Unauthorized to delete this Activity";
             }
 
-            List<ActivitySkill> skills = await _datacontext.Activity_Skills
-                .Where(a => a.ActivityId == request).ToListAsync();
-            _datacontext.Activity.Remove(Activity);
-            _datacontext.Activity_Skills.RemoveRange(skills);
-            await _datacontext.SaveChangesAsync();
-            return "Activity Deleted Successfully";
         }
     }
 }

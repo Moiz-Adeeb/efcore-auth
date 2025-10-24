@@ -2,8 +2,9 @@
 {
     public class SkillOutputDto
     {
-        public required Guid SkillId { get; set; }
-        public required string SkillName { get; set; }
-        public required string SkillDescription { get; set; }
+        public Guid SkillId { get; set; }
+        public string SkillName { get; set; } = string.Empty;
+        public string SkillDescription { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
     }
 }

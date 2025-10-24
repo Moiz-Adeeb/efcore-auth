@@ -1,6 +1,4 @@
-﻿using efcore.Services;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace efcore.Controllers
@@ -9,121 +7,48 @@ namespace efcore.Controllers
     [ApiController]
     public class CategoryController : ControllerBase
     {
-        private readonly ICategoryService _CategoryService;
+        private readonly ICategoryService _categoryService;
 
-        public CategoryController(ICategoryService CategoryService)
+        public CategoryController(ICategoryService categoryService)
         {
-            this._CategoryService = CategoryService;
+            this._categoryService = categoryService;
         }
         [HttpGet("get")]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<List<CategoryOutputDto>?>> GetCategory()
+        public async Task<List<CategoryOutputDto>?> GetCategory()
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (Guid.TryParse(userId, out Guid request))
-            {
-                List<CategoryOutputDto>? category = await _CategoryService.GetCategory(request);
-                if (category == null)
-                {
-                    return NotFound("Category not Found");
-                }
-                return Ok(category);
-            }
-            else
-            {
-                return BadRequest("Invalid user ID");
-            }
+            return await _categoryService.GetCategory();
         }
         [HttpGet("getall")]
-        [Authorize(Roles = "Admin")]
-        public async Task<ActionResult<List<CategoryOutputDto>>> GetAllCategory()
+        [Authorize(Roles = "Admin, Manager")]
+        public async Task<List<CategoryOutputDto>?> GetAllCategory()
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (Guid.TryParse(userId, out Guid request))
-            {
-                List<CategoryOutputDto> category = await _CategoryService.GetAllCategory();
-                if (category == null)
-                {
-                    return NotFound("Category not Found");
-                }
-                return Ok(category);
-            }
-            else
-            {
-                return BadRequest("Invalid user ID");
-            }
+            return await _categoryService.GetAllCategory();
         }
         [HttpGet("getcategory")]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<CategoryOutputDto>> GetCategoryById(Guid request)
+        public async Task<CategoryOutputDto?> GetCategoryById(Guid request)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (Guid.TryParse(userId, out Guid sender))
-            {
-                CategoryOutputDto? category = await _CategoryService.GetCategoryById(request, sender);
-                if (category == null)
-                {
-                    return NotFound("Category not Found");
-                }
-                return Ok(category);
-            }
-            else
-            {
-                return BadRequest("Invalid user ID");
-            }
+            return await _categoryService.GetCategoryById(request);
         }
         [HttpPost]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<string>> AddCategory(CategoryInputDto request)
+        public async Task<string?> AddCategory(CategoryInputDto request)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            //var sender = Guid.Parse(userId);
-            if (Guid.TryParse(userId, out Guid sender))
-            {
-                return Ok(await _CategoryService.AddCategory(request, sender));
-            }
-            else
-            {
-                return BadRequest("Invalid user ID.");
-            }
+            return await _categoryService.AddCategory(request);
         }
-        [HttpPut("{request}")]
+        [HttpPut($"{{{nameof(request)}}}")]
         [Authorize(Roles = "User")]
-        public async Task<ActionResult<string>> UpdateCategoryById(Guid request, CategoryInputDto newCategory)
+        public async Task<string?> UpdateCategoryById(Guid request, CategoryInputDto newCategory)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (Guid.TryParse(userId, out Guid sender))
-            {
-                var categories = await _CategoryService.UpdateCategoryById(request, newCategory, sender);
-                if (categories == null)
-                {
-                    return NotFound("Category not Found");
-                }
-                return Ok(categories);
-            }
-            else
-            {
-                return BadRequest("Invalid user ID.");
-            }
+            return await _categoryService.UpdateCategoryById(request, newCategory);
         }
-        [HttpDelete("{request}")]
-        [Authorize(Roles = "User")]
-        public async Task<ActionResult<string>> DeleteCategoryById(Guid request)
+
+        [HttpDelete($"{{{nameof(request)}}}")]
+        [Authorize(Roles = "User, Admin, Manager")]
+        public async Task<string?> DeleteCategoryById(Guid request)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (Guid.TryParse(userId, out Guid sender))
-            {
-                var categories = await _CategoryService.DeleteCategoryById(request, sender);
-                if (categories == null)
-                {
-                    return NotFound("Category not Found");
-                }
-                return Ok(categories);
-            }
-            else
-            {
-                return BadRequest("Invalid user ID.");
-            }
+            return await _categoryService.DeleteCategoryById(request);
         }
     }
 }

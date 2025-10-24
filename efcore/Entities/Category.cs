@@ -5,7 +5,8 @@
         public Guid CategoryId { get; set; }
         public string CategoryName { get; set; } = string.Empty;
         public string CategoryDescription { get; set; } = string.Empty;
-        public Guid UserId { get; set; } 
+        public Guid UserId { get; set; }
+        public User User { get; set; } = null!;
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public CategoryInputDto ToInputDto()
@@ -23,6 +24,7 @@
                 CategoryId = this.CategoryId,
                 CategoryName = this.CategoryName,
                 CategoryDescription = this.CategoryDescription,
+                UserName = this.User.Username
             };
         }
     }

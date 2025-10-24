@@ -2,11 +2,11 @@
 {
     public interface IActivityService
     {
-        Task<List<ActivityOutputDto>> GetActivity(Guid request);
-        Task<List<ActivityOutputDto>> GetAllActivity();
-        Task<ActivityOutputDto?> GetActivityById(Guid request, Guid sender);
-        Task<string?> AddActivity(ActivityInputDto request, Guid sender);
-        Task<string?> UpdateActivityById(Guid request, ActivityInputDto newActivity, Guid sender);
-        Task<string?> DeleteActivityById(Guid request, Guid sender);
+        Task<List<ActivityOutputDto>?> GetActivity();
+        Task<List<ActivityOutputDto>?> GetAllActivity();
+        Task<ActivityOutputDto?> GetActivityById(Guid request);
+        Task<string?> AddActivity(ActivityInputDto request);
+        Task<string?> UpdateActivityById(Guid request, ActivityInputDto newActivity);
+        Task<string?> DeleteActivityById(Guid request);
     }
 }

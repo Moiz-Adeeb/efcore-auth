@@ -1,87 +1,100 @@
-﻿using efcore.Data;
-using Org.BouncyCastle.Asn1.Ocsp;
-
-namespace efcore.Services
+﻿namespace efcore.Services
 {
     public class SkillService : ISkillService
     {
-        private readonly DataContext _datacontext;
-        public SkillService(DataContext datacontext)
+        private readonly DataContext _dataContext;
+        private readonly IHttpContextAccessor _contextAccessor;
+        public SkillService(DataContext dataContext, IHttpContextAccessor contextAccessor)
         {
-            _datacontext = datacontext;
+            _dataContext = dataContext;
+            _contextAccessor = contextAccessor;
         }
-        public async Task<List<SkillOutputDto>?> GetSkill(Guid request)
+        public async Task<List<SkillOutputDto>?> GetSkill()
         {
-            var skill = await _datacontext.Skill
-                .Where(u => u.UserId == request)
-                .Select(c => c.ToOutputDto())
+            var userId = _contextAccessor.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!Guid.TryParse(userId, out var id)!) return null;
+            var skill = await _dataContext.Skill
+                .Where(u => u.UserId == id)
+                .AsNoTracking()
+                .Select(c => new SkillOutputDto
+                {
+                    SkillId = c.SkillId,
+                    SkillName = c.SkillName,
+                    SkillDescription = c.SkillDescription,
+                    UserName = c.User.Username
+
+                })
                 .ToListAsync();
             return skill;
         }
-        public async Task<List<SkillOutputDto>> GetAllSkill()
+        public async Task<List<SkillOutputDto>?> GetAllSkill()
         {
-            return await _datacontext.Skill.Select(c => c.ToOutputDto()).ToListAsync();
+            var role = _contextAccessor.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (role is not ("Admin" or "Manager")) return null;
+            return await _dataContext.Skill
+                .AsNoTracking()
+                .Select(c => new SkillOutputDto
+                {
+                    SkillId = c.SkillId,
+                    SkillName = c.SkillName,
+                    SkillDescription = c.SkillDescription,
+                    UserName = c.User.Username
+
+                })
+                .ToListAsync();
         }
-        public async Task<SkillOutputDto?> GetSkillById(Guid request, Guid sender)
+        public async Task<SkillOutputDto?> GetSkillById(Guid request)
         {
-            Skill? skill = await _datacontext.Skill.FindAsync(request);
-            if (skill == null)
-            {
-                return null;
-            }
-            if (skill.UserId != sender)
-            {
-                return null;
-            }
-            return skill.ToOutputDto();
+            var userId = _contextAccessor.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!Guid.TryParse(userId, out var id)!) return null;
+            var skill = await _dataContext.Skill.FindAsync(request);
+            if (skill == null) return null;
+            return skill.UserId != id ? null : skill.ToOutputDto();
         }
-        public async Task<string?> AddSkill(SkillInputDto request, Guid sender)
+        public async Task<string?> AddSkill(SkillInputDto request)
         {
+            var userId = _contextAccessor.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!Guid.TryParse(userId, out var id)!) return null;
             var newSkill = new Skill
             {
                 SkillId = Guid.NewGuid(),
                 SkillName = request.SkillName,
                 SkillDescription = request.SkillDescription,
-                UserId = sender,
+                UserId = id,
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now
             };
-            await _datacontext.Skill.AddAsync(newSkill);
-            _datacontext.SaveChanges();
+            await _dataContext.Skill.AddAsync(newSkill);
+            await _dataContext.SaveChangesAsync();
             return "Skill Added Successfully";
         }
-        public async Task<string?> UpdateSkillById(Guid request, SkillInputDto newSkill, Guid sender)
+        public async Task<string?> UpdateSkillById(Guid request, SkillInputDto newSkill)
         {
-            Skill? skill = await _datacontext.Skill.FindAsync(request);
-            if (skill == null)
-            {
-                return "Skill not Found";
-            }
-            if (skill.UserId != sender)
-            {
-                return "Unauthorized to update this category";
-            }
+            var userId = _contextAccessor.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!Guid.TryParse(userId, out var id)!) return null;
+            var skill = await _dataContext.Skill.FindAsync(request);
+            if (skill == null) return "Skill not Found";
+            if (skill.UserId != id) return "Unauthorized to update this category";
             skill.SkillName = newSkill.SkillName;
             skill.SkillDescription = newSkill.SkillDescription;
             skill.UpdatedAt = DateTime.Now;
-            await _datacontext.SaveChangesAsync();
+            await _dataContext.SaveChangesAsync();
             return "Skill Updated Successfully";
         }
-        public async Task<string?> DeleteSkillById(Guid request, Guid sender)
+        public async Task<string?> DeleteSkillById(Guid request)
         {
-            Skill? skill = await _datacontext.Skill
+            var userId = _contextAccessor.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var role = _contextAccessor.HttpContext!.User.FindFirstValue(ClaimTypes.Role);
+            if (!Guid.TryParse(userId, out var id)!) return null;
+            var skill = await _dataContext.Skill
                 .FindAsync(request);
-            if (skill == null)
+            if (skill == null) return "Skill not Found";
+            if (skill.UserId == id || role == "Manager" || role == "Admin")
             {
-                return "Skill not Found";
-            }
-            if (skill.UserId != sender)
-            {
-                return "Unauthorized to delete this skill";
-            }
-            _datacontext.Skill.Remove(skill);
-            await _datacontext.SaveChangesAsync();
-            return "Skill Deletted Successfully";
+                _dataContext.Skill.Remove(skill);
+                await _dataContext.SaveChangesAsync();
+                return "Skill Deleted Successfully";
+            } else return "Unauthorized to delete this skill";
         }
     }
 }
